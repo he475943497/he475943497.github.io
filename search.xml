@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<search>
+  <entry>
+    <title><![CDATA[你好世界]]></title>
+    <url>%2F2017%2F08%2F31%2F3%2F</url>
+    <content type="text"><![CDATA[欢迎来的 Hexo 的世界! 这是你的第一个帖子.仔细检查一下 documentation 更多信息。如果你在使用Hexo上遇到任何问题，你可以找到答案 troubleshooting 或者你可以询问 GitHub. 快速开始创建第一个帖子1$ hexo new "My New Post" 更多信息: Writing 运行服务器1$ hexo server 更多信息: Server 生成静态文件1$ hexo generate 更多信息: Generating 部署到远程站点1$ hexo deploy 更多信息: Deployment]]></content>
+  </entry>
+  <entry>
+    <title><![CDATA[你好世界]]></title>
+    <url>%2F2017%2F08%2F31%2F2%2F</url>
+    <content type="text"><![CDATA[欢迎来的 Hexo 的世界! 这是你的第一个帖子.仔细检查一下 documentation 更多信息。如果你在使用Hexo上遇到任何问题，你可以找到答案 troubleshooting 或者你可以询问 GitHub. 快速开始创建第一个帖子1$ hexo new "My New Post" 更多信息: Writing 运行服务器1$ hexo server 更多信息: Server 生成静态文件1$ hexo generate 更多信息: Generating 部署到远程站点1$ hexo deploy 更多信息: Deployment]]></content>
+  </entry>
+  <entry>
+    <title><![CDATA[你好世界]]></title>
+    <url>%2F2017%2F08%2F31%2F1%2F</url>
+    <content type="text"><![CDATA[欢迎来的 Hexo 的世界! 这是你的第一个帖子.仔细检查一下 documentation 更多信息。如果你在使用Hexo上遇到任何问题，你可以找到答案 troubleshooting 或者你可以询问 GitHub. 快速开始创建第一个帖子1$ hexo new "My New Post" 更多信息: Writing 运行服务器1$ hexo server 更多信息: Server 生成静态文件1$ hexo generate 更多信息: Generating 部署到远程站点1$ hexo deploy 更多信息: Deployment]]></content>
+  </entry>
+  <entry>
+    <title><![CDATA[你好世界]]></title>
+    <url>%2F2017%2F08%2F31%2Fhello-world%2F</url>
+    <content type="text"><![CDATA[欢迎来的 Hexo 的世界! 这是你的第一个帖子.仔细检查一下 documentation 更多信息。如果你在使用Hexo上遇到任何问题，你可以找到答案 troubleshooting 或者你可以询问 GitHub. 快速开始创建第一个帖子1$ hexo new "My New Post" 更多信息: Writing 运行服务器1$ hexo server 更多信息: Server 生成静态文件1$ hexo generate 更多信息: Generating 部署到远程站点1$ hexo deploy 更多信息: Deployment]]></content>
+  </entry>
+  <entry>
+    <title><![CDATA[hexo搭建个人博客]]></title>
+    <url>%2F2017%2F08%2F31%2Fhexo%E6%90%AD%E5%BB%BA%E4%B8%AA%E4%BA%BA%E5%8D%9A%E5%AE%A2%2F</url>
+    <content type="text"><![CDATA[环境ubantu 17.04 必备git nodejs npm nvm 具体怎么安装百度一下即可方法很多 注意所关联github上个人仓库必须和用户名相同 如用户名为heweiwei 则仓库名应该为heweiwei.github.io 中文乱码解决 vimrc添加一下内容set fileencodings=utf-8,gb2312,gbk,gb18030set termencoding=utf-8set encoding=prc 安装hexo前面各个必备软件安装正常执行 npm install -g hexo-cli 推送到远程hexo init hexowebcd hexoweb/npm installhexo cleanhexo new your post namehexo generatehexo deploy当然这样做之后访问的页面很简单具体修改参见:hexo官方文档 访问浏览器输入yourname.github.io即可访问也可以去域名服务商买一个域名价格不等我买的.top顶级域第一年8块大洋]]></content>
+      <categories>
+        <category>搭建博客</category>
+      </categories>
+      <tags>
+        <tag>hexo</tag>
+        <tag>博客</tag>
+      </tags>
+  </entry>
+</search>
