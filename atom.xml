@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://heweiblog.top/"/>
-  <updated>2017-09-08T10:37:52.831Z</updated>
+  <updated>2017-09-11T02:22:49.216Z</updated>
   <id>http://heweiblog.top/</id>
   
   <author>
@@ -14,6 +14,114 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>cetos6.8mysql安装</title>
+    <link href="http://heweiblog.top/2017/09/11/cetos6-8mysql%E5%AE%89%E8%A3%85/"/>
+    <id>http://heweiblog.top/2017/09/11/cetos6-8mysql安装/</id>
+    <published>2017-09-11T02:20:47.000Z</published>
+    <updated>2017-09-11T02:22:49.216Z</updated>
+    
+    <content type="html"><![CDATA[<a id="more"></a>
+<p>一，wget <a href="http://dev.mysql.com/get/mysql57-community-release-el6-8.noarch.rpm" target="_blank" rel="external">http://dev.mysql.com/get/mysql57-community-release-el6-8.noarch.rpm</a></p>
+<p>二，yum localinstall mysql57-community-release-el6-8.noarch.rpm</p>
+<p>三，yum install mysql-server</p>
+<p>四，mysqld –initialize –user=mysql</p>
+<p>五，找到密码 vi /var/log/mysqld.log 末尾localhost：后面就是临时密码</p>
+<p>六，启动mysql服务 service mysqld start</p>
+<p>七，修改密码 mysqladmin -uroot -p password 输入临时密码或复制也可以，设置新密码</p>
+<p>八，chkconfig mysqld on 此步骤可做可不做</p>
+<p>九，mysql -u root -p 输入密码启动</p>
+]]></content>
+    
+    <summary type="html">
+    
+      mysql安装
+    
+    </summary>
+    
+      <category term="mysql" scheme="http://heweiblog.top/categories/mysql/"/>
+    
+    
+      <category term="mysql" scheme="http://heweiblog.top/tags/mysql/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>安装python3.5</title>
+    <link href="http://heweiblog.top/2017/09/11/%E5%AE%89%E8%A3%85python3-5/"/>
+    <id>http://heweiblog.top/2017/09/11/安装python3-5/</id>
+    <published>2017-09-11T01:49:47.000Z</published>
+    <updated>2017-09-11T01:53:27.835Z</updated>
+    
+    <content type="html"><![CDATA[<a id="more"></a>
+<h2 id="安装python3-5可能使用的依赖"><a href="#安装python3-5可能使用的依赖" class="headerlink" title="安装python3.5可能使用的依赖"></a>安装python3.5可能使用的依赖</h2><p>[root@heweiwei heweiwei]# yum install openssl-devel bzip2-devel expat-devel gdbm-devel readline-devel sqlite-devel</p>
+<h2 id="到python官网找到下载路径-用wget下载"><a href="#到python官网找到下载路径-用wget下载" class="headerlink" title="到python官网找到下载路径, 用wget下载"></a>到python官网找到下载路径, 用wget下载</h2><p>[root@heweiwei heweiwei]# wget <a href="https://www.python.org/ftp/python/3.5.1/Python-3.5.1.tgz" target="_blank" rel="external">https://www.python.org/ftp/python/3.5.1/Python-3.5.1.tgz</a></p>
+<h2 id="解压tgz包"><a href="#解压tgz包" class="headerlink" title="解压tgz包"></a>解压tgz包</h2><p>[root@heweiwei heweiwei]# tar -zxvf Python-3.5.1.tgz</p>
+<h2 id="把python移到-usr-local下面"><a href="#把python移到-usr-local下面" class="headerlink" title="把python移到/usr/local下面"></a>把python移到/usr/local下面</h2><p>[root@heweiwei heweiwei]# mv Python-3.5.1 /usr/local</p>
+<h2 id="删除旧版本的python依赖"><a href="#删除旧版本的python依赖" class="headerlink" title="删除旧版本的python依赖"></a>删除旧版本的python依赖</h2><p>[root@heweiwei heweiwei]# ll /usr/bin | grep python<br>-rwxr-xr-x.   1 root root      20152 May 12  2016 abrt-action-analyze-python<br>-rwxr-xr-x.   2 root root       9032 Aug 18  2016 python<br>lrwxrwxrwx.   1 root root          6 Feb 27 16:05 python2 -&gt; python<br>-rwxr-xr-x.   2 root root       9032 Aug 18  2016 python2.6<br>-rwxr-xr-x.   1 root root       1418 Aug 18  2016 python2.6-config<br>lrwxrwxrwx.   1 root root         16 Feb 28 17:21 python-config -&gt; python2.6-config</p>
+<p>[root@heweiwei heweiwei]# rm -rf /usr/bin/python</p>
+<p>进入python目录<br>[root@heweiwei heweiwei]# cd /usr/local/Python-3.5.1/<br>[root@heweiwei Python-3.5.1]# </p>
+<h2 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h2><p>[root@heweiwei Python-3.5.1]# ./configure</p>
+<h2 id="编译-make"><a href="#编译-make" class="headerlink" title="编译 make"></a>编译 make</h2><p>[root@heweiwei Python-3.5.1]# make</p>
+<h2 id="编译，安装"><a href="#编译，安装" class="headerlink" title="编译，安装"></a>编译，安装</h2><p>[root@heweiwei Python-3.5.1]# make install</p>
+<h2 id="删除旧的软链接，创建新的软链接到最新的python"><a href="#删除旧的软链接，创建新的软链接到最新的python" class="headerlink" title="删除旧的软链接，创建新的软链接到最新的python"></a>删除旧的软链接，创建新的软链接到最新的python</h2><p>[root@heweiwei Python-3.5.1]# rm -rf /usr/bin/python<br>[root@heweiwei Python-3.5.1]# ln -s /usr/local/bin/python3.5 /usr/bin/python</p>
+<h2 id="查看版本"><a href="#查看版本" class="headerlink" title="查看版本"></a>查看版本</h2><p>[heweiwei@heweiwei ~]$ python -V<br>Python 3.5.1</p>
+]]></content>
+    
+    <summary type="html">
+    
+      python3安装
+    
+    </summary>
+    
+      <category term="python" scheme="http://heweiblog.top/categories/python/"/>
+    
+    
+      <category term="python" scheme="http://heweiblog.top/tags/python/"/>
+    
+      <category term="python3" scheme="http://heweiblog.top/tags/python3/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>rpm包制作</title>
+    <link href="http://heweiblog.top/2017/09/11/rpm%E5%8C%85%E5%88%B6%E4%BD%9C/"/>
+    <id>http://heweiblog.top/2017/09/11/rpm包制作/</id>
+    <published>2017-09-11T01:42:59.000Z</published>
+    <updated>2017-09-11T01:47:28.483Z</updated>
+    
+    <content type="html"><![CDATA[<a id="more"></a>
+<h2 id="rpm-即软件包管理"><a href="#rpm-即软件包管理" class="headerlink" title="rpm 即软件包管理"></a>rpm 即软件包管理</h2><p>关键点：SPEC文档    </p>
+<h2 id="生成工作目录："><a href="#生成工作目录：" class="headerlink" title="生成工作目录："></a>生成工作目录：</h2><p>[root@localhost heweiwei]# yum install rpmdevtools<br>[heweiwei@localhost ~]$ rpmdev-setuptree        此命令用来生成 rpmbuild 目录<br>[heweiwei@localhost ~]$ ls rpmbuild/<br>BUILD  RPMS  SOURCES  SPECS  SRPMS</p>
+<h2 id="目录分配："><a href="#目录分配：" class="headerlink" title="目录分配："></a>目录分配：</h2><p>SOURCES放置打包资源，包括源码打包文件和补丁文件等；<br>SPECS目录放置SPEC文档；<br>BUILD打包过程中的工作目录；<br>RPMS目录存放生成的二进制包，RPM包根据硬件平台不同分类，i386表示生成i386结构的包将存放在该目录下;<br>SRPMS目录存放生成的源码包。</p>
+<h2 id="撰写SPEC文档-（最为核心）"><a href="#撰写SPEC文档-（最为核心）" class="headerlink" title="撰写SPEC文档 （最为核心）"></a>撰写SPEC文档 （最为核心）</h2><p>SPEC文档包括了 rpm打包过程的操作内容和新生成rpm包的基本信息等 它的作用对象是打包程序 rpmbuild<br>SPEC文档编写参考模板文件然后一步步扩展</p>
+<p>生成rpm包的源代码、shell脚本、配置文件都拷贝到SOURCES目录里，注意通常情况下源码的压缩格式都为*.tar.gz格式<br>然后，将最最最重要的SPEC文件，命名格式一般是“软件名-版本.spec”的形式，将其拷贝到SPECS目录，切换到该目录下执行<br>rpmbuild -ba 软件名-版本.spec<br>-ba表示build all，即生成包括二进制包和源代码包的所有RPM包，<br>如果正常的话，rpmbuild将正常退出，同时在RPMS目录和SRPMS目录中将生成对应的RPM包。</p>
+<p>关键就是SPEC文件的写法，我们可以用rpmdev-newspec -o Name-version.spec命令来生成SPEC文件的模板，<br>然后在上面修改即可</p>
+<h2 id="创建-安装-卸载"><a href="#创建-安装-卸载" class="headerlink" title="创建 安装 卸载"></a>创建 安装 卸载</h2><p>rpmbuild -bb edns_dial.spec    创建rpm包<br>rpm -qlp /root/rpmbuild/RPMS/x86_64/edns_dial-1.1.1.5-1.el6.x86_64.rpm    查看安装情况<br>rpm -ivh edns_dial-1.1.1.5-1.el6.x86_64.rpm      安装<br>rpm -ivh edns_dial-1.1.1.5-1.el6.x86_64.rpm  –force（发生冲突强制执行）<br>rpm -e ends_dial        卸载</p>
+<h2 id="特殊情况"><a href="#特殊情况" class="headerlink" title="特殊情况"></a>特殊情况</h2><p>出现此情况<br>libcrypto.so.10()(64bit) is needed by edns_dial-1.1.1.5-1.el6.x86_64<br>file /usr/bin/edns_dial from install of edns_dial-1.1.1.5-1.el6.x86_64 conflicts<br>with file from package dnsys-3.1.1.368-ydns_743863.x86_64<br>用此命令<br>rpm -ivh edns_dial-1.1.1.5-1.el6.x86_64.rpm –nodeps –force        </p>
+<p>rpm包安装后的可执行程序一般为release版本若想要保留调试信息则应该在spec文件加入以下信息<br>调试信息的作用不大，一般自动删除调试信息</p>
+<p>%define debug_package %{nil}<br>%define __strip /bin/true</p>
+<p>[root@localhost BUILD]# rpm -ivh /root/rpmbuild/RPMS/x86_64/edns_dial-1.1.1.7-1.el6.x86_64.rpm<br>Preparing…                ########################################### [100%]<br>1:edns_dial              ########################################### [100%]<br>[root@localhost BUILD]# md5sum edns_dial-1.1.1.7/edns_dial<br>f569fa864f820a4a0dc3d30f057ca4e5  edns_dial-1.1.1.7/edns_dial<br>[root@localhost BUILD]# md5sum /usr/bin/edns_dial<br>f569fa864f820a4a0dc3d30f057ca4e5  /usr/bin/edns_dial<br>[root@localhost BUILD]# rpm -e edns_dial<br>[root@localhost BUILD]#<br>对比后md5值一模一样</p>
+<h2 id="卸载出现此情况解决方案"><a href="#卸载出现此情况解决方案" class="headerlink" title="卸载出现此情况解决方案"></a>卸载出现此情况解决方案</h2><p>[root@localhost heweiwei]# rpm -e edns_dial<br>error: “edns_dial” specifies multiple packages:<br>edns_dial-1.1.1.5-enterprise.el6.x86_64<br>edns_dial-1.1.1.5-1.el6.x86_64<br>[root@localhost heweiwei]# rpm -e edns_dial –allmatches<br>edns_dial-1.1.1.5-enterprise.el6.x86_64 edns_dial-1.1.1.5-1.el6.x86_64</p>
+<p>rpmbuild –showrc | grep topdir      查看系统默认的工作车间<br>自定义目录（车间）<br>vi ~/.rpmmacros<br>%_topdir        /home/heweiwei/rpmbuild    ##目录可以自定义<br>mkdir ~/rpmbuild<br>cd ~/rpmbuild<br>mkdir -pv {BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} </p>
+<p>rpm -qi edns_dial 查看 rpm 包安装程序的详细信息</p>
+]]></content>
+    
+    <summary type="html">
+    
+      rpm包相当于windows下的软件安装包
+    
+    </summary>
+    
+      <category term="linux基础" scheme="http://heweiblog.top/categories/linux%E5%9F%BA%E7%A1%80/"/>
+    
+    
+      <category term="rpm" scheme="http://heweiblog.top/tags/rpm/"/>
+    
+      <category term="打包" scheme="http://heweiblog.top/tags/%E6%89%93%E5%8C%85/"/>
+    
+  </entry>
   
   <entry>
     <title>快速入门shell脚本</title>
