@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://heweiblog.top/"/>
-  <updated>2017-09-11T02:22:49.216Z</updated>
+  <updated>2017-09-14T11:39:05.939Z</updated>
   <id>http://heweiblog.top/</id>
   
   <author>
@@ -14,6 +14,104 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>linux内核之list.h</title>
+    <link href="http://heweiblog.top/2017/09/14/linux%E5%86%85%E6%A0%B8%E4%B9%8Blist-h/"/>
+    <id>http://heweiblog.top/2017/09/14/linux内核之list-h/</id>
+    <published>2017-09-14T11:28:08.000Z</published>
+    <updated>2017-09-14T11:39:05.939Z</updated>
+    
+    <content type="html"><![CDATA[<a id="more"></a>
+<p><a href="http://www.linuxidc.com/Linux/2011-10/44627.htm" target="_blank" rel="external">大而全参考地址</a><br>非常详细</p>
+<h2 id="内核中经常采用链表来管理对象，先看一下内核中对链表的定义"><a href="#内核中经常采用链表来管理对象，先看一下内核中对链表的定义" class="headerlink" title="内核中经常采用链表来管理对象，先看一下内核中对链表的定义"></a>内核中经常采用链表来管理对象，先看一下内核中对链表的定义</h2><p>struct list_head {<br>    struct list_head <em>next, </em>prev;<br>};</p>
+<p>一般将该数据结构嵌入到其他的数据结构中，从而使得内核可以通过链表的方式管理新的数据结构，看一个例子:<br>struct example {<br>    member a;<br>    struct list_head list;<br>    member b;<br>};</p>
+<h2 id="1、链表的定义和初始化"><a href="#1、链表的定义和初始化" class="headerlink" title="1、链表的定义和初始化"></a>1、链表的定义和初始化</h2><p>您可以通过两种方式来定义和初始化一个链表头结点，例如，您想定义一个链表头结点mylist，那么您可以这么做：<br>① LIST_HEAD(mylist);  // 使用LIST_HEAD宏定义并初始化一个链表<br>也可以这么做：<br>② struct list_head mylist;  // 定义一个链表<br>INIT_LIST_HEAD(&amp;mylist); // 使用INIT_LIST_HEAD函数初始化链表</p>
+<p>可以看出方式①稍微简单一点，我们先来分析一下LIST_HEAD宏：</p>
+<p>#define LIST_HEAD_INIT(name) { &amp;(name), &amp;(name) }</p>
+<p>#define LIST_HEAD(name) /<br>struct list_head name = LIST_HEAD_INIT(name)</p>
+<p>很容易看出LIST_HEAD(mylist);会被扩展为：<br>struct list_head mylist = { &amp;(mylist), &amp;(mylist) };</p>
+<p>list_head结构只有两个成员：next和prev。从上面的代码可以看出，next和prev都被赋值为链表mylist的地址，也就是说，链表初始<br>化后next和prev都是指向自己的。</p>
+<p>大多数情况下，list_head是被嵌入到其他数据结构中的，比如上面的example结构里的list成员，那么如何对list成员进行初始化？通过调用INIT_LIST_HEAD函数：<br>struct example test;<br>INIT_LIST_HEAD(&amp;test.list);<br>该函数简单地将list成员的prev和next指针指向自己。</p>
+<p>可以看出链表结点在初始化时，都将prev和next指向自己。注意：对链表的初始化非常重要，因为如果使用一个未被初始化的链表结点，很有可能会导致内核异常。例如，在对一个链表结点调用list_del函数后，接着再去对该结点进行一些操作。后面会有分析的：）</p>
+<h2 id="2、对链表常用的操作"><a href="#2、对链表常用的操作" class="headerlink" title="2、对链表常用的操作"></a>2、对链表常用的操作</h2><p>对链表常用的操作无非就是增加、删除、遍历等。当然内核还提供很多其他的操作，如替换某个结点、将某个结点移动到链表尾端等等，这些操作都是通过调用基本的增加、删除等操作完成的。</p>
+<h3 id="①-增加：list-add和list-add-tail"><a href="#①-增加：list-add和list-add-tail" class="headerlink" title="① 增加：list_add和list_add_tail"></a>① 增加：list_add和list_add_tail</h3><p>调用list_add可以将一个新链表结点插入到一个已知结点的后面；<br>调用list_add_tail可以将一个新链表结点插入到一个已知结点的前面；</p>
+<p>下面分析它们的具体实现，它们都以不同的参数调用了相同的函数<strong>list_add：<br>static inline void </strong>list_add(struct list_head <em>new,<br>        struct list_head </em>prev,<br>        struct list_head *next)<br>{<br>    next-&gt;prev = new;<br>    new-&gt;next = next;<br>    new-&gt;prev = prev;<br>    prev-&gt;next = new;<br>}<br>该函数将new结点插入到prev结点和next之间；</p>
+<p>static inline void list_add(struct list_head <em>new, struct list_head </em>head)<br>{<br>    <strong>list_add(new, head, head-&gt;next);<br>}<br>list_add函数中以new、head、head-&gt;next为参数调用</strong>list_add，将new结点插入到head和head-&gt;next之间，也就是将new结点插入到特定的已知结点head的后面；</p>
+<p>static inline void list_add_tail(struct list_head <em>new, struct list_head </em>head)<br>{<br>    <strong>list_add(new, head-&gt;prev, head);<br>}<br>而list_add_tail函数则以new、head-&gt;prev、head为参数调用</strong>list_add，将new结点插入到head-&gt;prev和head之间，也就是将new结点插入到特定的已知结点head的前面。</p>
+<p>有了list_add和list_add_tail，我们可以很方便地实现栈（list_add）和队列（list_add_tail），在本文的最后一节，我们再做详细的分析。</p>
+<h3 id="②-删除：list-del和list-del-init"><a href="#②-删除：list-del和list-del-init" class="headerlink" title="② 删除：list_del和list_del_init"></a>② 删除：list_del和list_del_init</h3><p>调用list_del函数删除链表中的一个结点；<br>调用list_del_init函数删除链表中的一个结点，并初始化被删除的结点（也就是使被删除的结点的prev和next都指向自己）；</p>
+<p>下面分析它们的具体实现，它们都调用了相同的函数<strong>list_del：<br>static inline void </strong>list_del(struct list_head <em> prev, struct list_head </em> next)<br>{<br>    next-&gt;prev = prev;<br>    prev-&gt;next = next;<br>}<br>该函数实际的作用是让prev结点和next结点互相指向；</p>
+<p>static inline void list_del(struct list_head *entry)<br>{<br>    <strong>list_del(entry-&gt;prev, entry-&gt;next);<br>    entry-&gt;next = LIST_POISON1;<br>    entry-&gt;prev = LIST_POISON2;<br>}<br>该函数中以entry-&gt;prev和entry-&gt;next为参数调用</strong>list_del函数，使得entry结点的前、后结点绕过entry直接互相指向，然后将entry结点的前后指针指向LIST_POISON1和LIST_POISON2，从而完成对entry结点的删除。此函数中的LIST_POISON1和LIST_POISON2有点让人费解，因为一般情况下我们删除entry后，应该让entry的prev和next指向NULL的，可是这里却不是，原因有待调查。</p>
+<p>static inline void list_del_init(struct list_head *entry)<br>{<br>    __list_del(entry-&gt;prev, entry-&gt;next);<br>    INIT_LIST_HEAD(entry);<br>}<br>与list_del不同，list_del_init将entry结点删除后，还会对entry结点做初始化，使得entry结点的prev和next都指向自己。</p>
+<h2 id="3、几个重要的宏"><a href="#3、几个重要的宏" class="headerlink" title="3、几个重要的宏"></a>3、几个重要的宏</h2><p>内核提供了一组宏，以方便对链表进行管理，下面我只介绍到目前为止，我遇到过的，可能会很少，因为我接触到的很有限，以后遇到其他的会添加进来的。下面开始我们的分析啦:)</p>
+<h3 id="①-list-entry"><a href="#①-list-entry" class="headerlink" title="① list_entry"></a>① list_entry</h3><p>前面说过，list_head结构通常被嵌入到其他数据结构中，以便内核可以通过链表的方式管理这些数据结构。假设这样一种场景：我们已知类型为example的对象的list成员的地址ptr（struct list_head *ptr），那么我们如何通过ptr来得到该example对象的地址呢？答案很明显，使用container_of宏。不过，在这样的情况下我们应该通过使用list_entry宏来完成container_of宏的功能，因为这样更容易理解一点。其实list_entry宏很简单：#define list_entry(ptr, type, member)  container_of(ptr, type, member) ……<br>上述情况，我们可以这样： list_entry(ptr, struct example, list); 来获取example对象的指针。</p>
+<h3 id="②-list-for-each-entry"><a href="#②-list-for-each-entry" class="headerlink" title="② list_for_each_entry"></a>② list_for_each_entry</h3><p>对链表的一个重要的操作就是对链表进行遍历，以达到某种应用目的，比如统计链表结点的个数等等。先来看看内核中对该宏的定义：</p>
+<p>#define list_for_each_entry(pos, head, member)    /<br>for (pos = list_entry((head)-&gt;next, typeof(<em>pos), member); /<br>        prefetch(pos-&gt;member.next), &amp;pos-&gt;member != (head);  /<br>        pos = list_entry(pos-&gt;member.next, typeof(</em>pos), member))</p>
+<p>其中，pos是指向宿主结构的指针，在for循环中是一个迭代变量；head是要进行遍历的链表头指针；member是list_head成员在宿主结构中的名字。</p>
+]]></content>
+    
+    <summary type="html">
+    
+      linux内核提供了一套完整简单实用的链表操作方法，非常值得值得学习，极具可移植可拓展
+    
+    </summary>
+    
+      <category term="linux基础" scheme="http://heweiblog.top/categories/linux%E5%9F%BA%E7%A1%80/"/>
+    
+    
+      <category term="list" scheme="http://heweiblog.top/tags/list/"/>
+    
+      <category term="linux基础" scheme="http://heweiblog.top/tags/linux%E5%9F%BA%E7%A1%80/"/>
+    
+      <category term="链表基础操作" scheme="http://heweiblog.top/tags/%E9%93%BE%E8%A1%A8%E5%9F%BA%E7%A1%80%E6%93%8D%E4%BD%9C/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>linux压缩命令</title>
+    <link href="http://heweiblog.top/2017/09/12/linux%E5%8E%8B%E7%BC%A9%E5%91%BD%E4%BB%A4/"/>
+    <id>http://heweiblog.top/2017/09/12/linux压缩命令/</id>
+    <published>2017-09-12T01:41:44.000Z</published>
+    <updated>2017-09-12T01:50:47.410Z</updated>
+    
+    <content type="html"><![CDATA[<a id="more"></a>
+<h2 id="举例"><a href="#举例" class="headerlink" title="举例"></a>举例</h2><p>[root@www ~]# tar [-j|-z] [cv] [-f 创建的档名] filename… &lt;==打包与压缩<br>[root@www ~]# tar [-j|-z] [tv] [-f 创建的档名]             &lt;==察看档名<br>[root@www ~]# tar [-j|-z] [xv] [-f 创建的档名] [-C 目录]   &lt;==解压缩</p>
+<h2 id="选项与参数："><a href="#选项与参数：" class="headerlink" title="选项与参数："></a>选项与参数：</h2><p>-c  ：创建打包文件，可搭配 -v 来察看过程中被打包的档名(filename)<br>-t  ：察看打包文件的内容含有哪些档名，重点在察看『档名』就是了；<br>-x  ：解打包或解压缩的功能，可以搭配 -C (大写) 在特定目录解开<br>      特别留意的是， -c, -t, -x 不可同时出现在一串命令列中。<br>-j  ：透过 bzip2 的支持进行压缩/解压缩：此时档名最好为 <em>.tar.bz2<br>-z  ：透过 gzip  的支持进行压缩/解压缩：此时档名最好为 </em>.tar.gz<br>-v  ：在压缩/解压缩的过程中，将正在处理的档名显示出来！<br>-f filename：-f 后面要立刻接要被处理的档名！建议 -f 单独写一个选项罗！<br>-C 目录    ：这个选项用在解压缩，若要在特定目录解压缩，可以使用这个选项。</p>
+<h2 id="其他后续练习会使用到的选项介绍："><a href="#其他后续练习会使用到的选项介绍：" class="headerlink" title="其他后续练习会使用到的选项介绍："></a>其他后续练习会使用到的选项介绍：</h2><p>-p  ：保留备份数据的原本权限与属性，常用於备份(-c)重要的配置档<br>-P  ：保留绝对路径，亦即允许备份数据中含有根目录存在之意；<br>–exclude=FILE：在压缩的过程中，不要将 FILE 打包！ </p>
+<h2 id="其实最简单的使用-tar-就只要记忆底下的方式即可："><a href="#其实最简单的使用-tar-就只要记忆底下的方式即可：" class="headerlink" title="其实最简单的使用 tar 就只要记忆底下的方式即可："></a>其实最简单的使用 tar 就只要记忆底下的方式即可：</h2><p>  ● 压　缩：tar -jcv -f filename.tar.bz2 要被压缩的文件或目录名称<br>  ● 查　询：tar -jtv -f filename.tar.bz2<br>  ● 解压缩：tar -jxv -f filename.tar.bz2 -C 欲解压缩的目录<br>  ● 压    缩：tar -zcvf <em>.tar.gz  dir/file<br>  ● 解压缩 ：tar -zxvf  </em>.tar.gz</p>
+<h2 id="更多压缩详解参考地址"><a href="#更多压缩详解参考地址" class="headerlink" title="更多压缩详解参考地址"></a><a href="http://cn.linux.vbird.org/linux_basic/0240tarcompress.php" target="_blank" rel="external">更多压缩详解参考地址</a></h2><h2 id="更多举例"><a href="#更多举例" class="headerlink" title="更多举例"></a>更多举例</h2><p>01-.tar格式<br>解包：[＊＊＊＊＊＊＊]$ tar xvf FileName.tar<br>打包：[＊＊＊＊＊＊＊]$ tar cvf FileName.tar DirName（注：tar是打包，不是压缩！）</p>
+<p>02-.gz格式<br>解压1：[＊＊＊＊＊＊＊]$ gunzip FileName.gz<br>解压2：[＊＊＊＊＊＊＊]$ gzip -d FileName.gz<br>压 缩：[＊＊＊＊＊＊＊]$ gzip FileName</p>
+<p>03-.tar.gz格式<br>解压：[＊＊＊＊＊＊＊]$ tar zxvf FileName.tar.gz<br>压缩：[＊＊＊＊＊＊＊]$ tar zcvf FileName.tar.gz DirName</p>
+<p>04-.bz2格式<br>解压1：[＊＊＊＊＊＊＊]$ bzip2 -d FileName.bz2<br>解压2：[＊＊＊＊＊＊＊]$ bunzip2 FileName.bz2<br>压 缩： [＊＊＊＊＊＊＊]$ bzip2 -z FileName</p>
+<p>05-.tar.bz2格式<br>解压：[＊＊＊＊＊＊＊]$ tar jxvf FileName.tar.bz2<br>压缩：[＊＊＊＊＊＊＊]$ tar jcvf FileName.tar.bz2 DirName</p>
+<p>06-.bz格式<br>解压1：[＊＊＊＊＊＊＊]$ bzip2 -d FileName.bz<br>解压2：[＊＊＊＊＊＊＊]$ bunzip2 FileName.bz</p>
+<p>07-.tar.bz格式<br>解压：[＊＊＊＊＊＊＊]$ tar jxvf FileName.tar.bz</p>
+<p>08-.Z格式<br>解压：[＊＊＊＊＊＊＊]$ uncompress FileName.Z<br>压缩：[＊＊＊＊＊＊＊]$ compress FileName</p>
+<p>09-.tar.Z格式<br>解压：[＊＊＊＊＊＊＊]$ tar Zxvf FileName.tar.Z<br>压缩：[＊＊＊＊＊＊＊]$ tar Zcvf FileName.tar.Z DirName</p>
+<p>10-.tgz格式<br>解压：[＊＊＊＊＊＊＊]$ tar zxvf FileName.tgz</p>
+<p>11-.tar.tgz格式<br>解压：[＊＊＊＊＊＊＊]$ tar zxvf FileName.tar.tgz<br>压缩：[＊＊＊＊＊＊＊]$ tar zcvf FileName.tar.tgz FileName</p>
+<p>12-.zip格式<br>解压：[＊＊＊＊＊＊＊]$ unzip FileName.zip<br>压缩：[＊＊＊＊＊＊＊]$ zip FileName.zip DirName</p>
+<p>13-.lha格式<br>解压：[＊＊＊＊＊＊＊]$ lha -e FileName.lha<br>压缩：[＊＊＊＊＊＊＊]$ lha -a FileName.lha FileName</p>
+<p>14-.rar格式<br>解压：[＊＊＊＊＊＊＊]$ rar a FileName.rar<br>压缩：[＊＊＊＊＊＊＊]$ rar e FileName.rar</p>
+]]></content>
+    
+    <summary type="html">
+    
+      压缩是一个非常常用的功能，linux提供了非常丰富的压缩功能，本文主要介绍了最常用的压缩方法
+    
+    </summary>
+    
+      <category term="linux命令" scheme="http://heweiblog.top/categories/linux%E5%91%BD%E4%BB%A4/"/>
+    
+    
+      <category term="压缩" scheme="http://heweiblog.top/tags/%E5%8E%8B%E7%BC%A9/"/>
+    
+      <category term="tar" scheme="http://heweiblog.top/tags/tar/"/>
+    
+      <category term="gzip" scheme="http://heweiblog.top/tags/gzip/"/>
+    
+  </entry>
   
   <entry>
     <title>cetos6.8mysql安装</title>
