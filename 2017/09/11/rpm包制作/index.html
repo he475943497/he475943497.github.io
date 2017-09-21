@@ -129,7 +129,7 @@
 <meta property="og:site_name" content="走在启程的路上">
 <meta property="og:description" content="rpm包相当于windows下的软件安装包">
 <meta property="og:locale" content="zh-Hans">
-<meta property="og:updated_time" content="2017-09-11T01:47:28.483Z">
+<meta property="og:updated_time" content="2017-09-19T08:17:06.843Z">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="rpm包制作">
 <meta name="twitter:description" content="rpm包相当于windows下的软件安装包">
@@ -464,6 +464,86 @@
 <h2 id="卸载出现此情况解决方案"><a href="#卸载出现此情况解决方案" class="headerlink" title="卸载出现此情况解决方案"></a>卸载出现此情况解决方案</h2><p>[root@localhost heweiwei]# rpm -e edns_dial<br>error: “edns_dial” specifies multiple packages:<br>edns_dial-1.1.1.5-enterprise.el6.x86_64<br>edns_dial-1.1.1.5-1.el6.x86_64<br>[root@localhost heweiwei]# rpm -e edns_dial –allmatches<br>edns_dial-1.1.1.5-enterprise.el6.x86_64 edns_dial-1.1.1.5-1.el6.x86_64</p>
 <p>rpmbuild –showrc | grep topdir      查看系统默认的工作车间<br>自定义目录（车间）<br>vi ~/.rpmmacros<br>%_topdir        /home/heweiwei/rpmbuild    ##目录可以自定义<br>mkdir ~/rpmbuild<br>cd ~/rpmbuild<br>mkdir -pv {BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} </p>
 <p>rpm -qi edns_dial 查看 rpm 包安装程序的详细信息</p>
+<h2 id="spec-文件举例"><a href="#spec-文件举例" class="headerlink" title="spec 文件举例"></a>spec 文件举例</h2><p>Name:        edns_dial<br>Version:    1.1.1.8<br>Release:    1%{?dist}<br>Summary:    dial    </p>
+<p>Group:        Applications/Internet<br>License:    GPL<br>URL:        <a href="http://www.yamutech.com" target="_blank" rel="external">http://www.yamutech.com</a><br>Source0:    %{name}-%{version}.tar.gz</p>
+<p>BuildRoot:      %{_topdir}/BUILDROOT</p>
+<p>#BuildRequires:    </p>
+<p>#Requires:        </p>
+<p>#%define debug_package %{nil}</p>
+<p>#%define __strip /bin/true</p>
+<p>#含有调试信息</p>
+<p>%description<br>dial</p>
+<p>%prep<br>%setup -q</p>
+<p>%build<br>make %{?_smp_mflags}</p>
+<p>#mkdir -p %{buildroot}/%{_bindir}</p>
+<p>#mkdir -p %{buildroot}/%{_sysconfdir}</p>
+<p>%install<br>rm -rf %{buildroot}<br>mkdir -p %{buildroot}/%{_bindir}</p>
+<p>#mkdir -p %{buildroot}/%{_libdir}<br>mkdir -p %{buildroot}/%{_sysconfdir}<br>mkdir -p %{buildroot}/%{_sysconfdir}/init.d<br>install -m 755 edns_dial %{buildroot}/%{_bindir}/edns_dial</p>
+<p>#install -m 755 libmysqlclient.so.18 %{buildroot}/%{_libdir}/libmysqlclient.so.18<br>install -m 755 config/dial_config %{buildroot}/%{_sysconfdir}/dial_config<br>install -m 755 config/dial_cert.pem %{buildroot}/%{_sysconfdir}/dial_cert.pem<br>install -m 755 ydial %{buildroot}/%{_sysconfdir}/init.d/ydial</p>
+<p>%clean<br>rm -rf %{buildroot}</p>
+<p>#rm -rf %{_topdir}/BUILDROOT</p>
+<p>#rm -rf %{_builddir}<br>rm -rf %{_topdir}/BUILD/%{name}-%{version}<br>rm -rf %{_topdir}/SOURCES/%{name}-%{version}.tar.gz<br>rm -rf %{_topdir}/SPECS/%{name}-%{version}.spec</p>
+<p>%post<br>chkconfig –add ydial</p>
+<p>%files<br>%defattr(-,root,root,-)<br>%{_bindir}/edns_dial<br>%{_sysconfdir}/dial_config<br>%{_sysconfdir}/dial_cert.pem<br>%{_sysconfdir}/init.d/ydial</p>
+<p>#/usr/bin/ends_dial</p>
+<p>#/usr/lib64/libmysqlclient.so.18</p>
+<p>#/etc/dial_config</p>
+<p>#/etc/dial_cert.pem</p>
+<p>%preun<br>chkconfig –del ydial</p>
+<p>%changelog</p>
+<h2 id="启动脚本"><a href="#启动脚本" class="headerlink" title="启动脚本"></a>启动脚本</h2><p>#!/bin/bash</p>
+<p>#edns_dial    start/stop manager</p>
+<p>#Authors: yamu, 2016, <a href="&#109;&#x61;&#105;&#108;&#x74;&#111;&#58;&#121;&#x61;&#x6d;&#x75;&#64;&#x79;&#x61;&#109;&#x75;&#116;&#x65;&#x63;&#x68;&#46;&#99;&#111;&#x6d;">&#121;&#x61;&#x6d;&#x75;&#64;&#x79;&#x61;&#109;&#x75;&#116;&#x65;&#x63;&#x68;&#46;&#99;&#111;&#x6d;</a></p>
+<p>#chkconfig: 345 13 87</p>
+<p>#description: edns_dial start/stop manager</p>
+<p>#processname: /usr/bin/edns_dial</p>
+<p>#pidfile: /var/run/edns_dial.pid</p>
+<p>#source function library<br>. /etc/rc.d/init.d/functions</p>
+<p>RETVAR=0<br>PROG=”edns_dial”<br>LOCK_FILE=/var/lock/subsys/edns_dial<br>pidfile=/var/run/edns_dial.pid<br>EDNS_DIAL_BIN=/usr/bin/edns_dial<br>kill_pid=/var/run/edns_dial.kill</p>
+<p>case “$1” in<br>    start)<br>        echo “Starting edns_dial: “<br>            daemon –pidfile=$pidfile ${EDNS_DIAL_BIN} start<br>            RETVAR=$?<br>        if [ $RETVAR -ne 0 ]<br>        then<br>            exit 6<br>        fi</p>
+<pre><code>    echo &quot;$(pgrep edns_dial|head -1)&quot; &gt; $pidfile
+    touch ${LOCK_FILE}
+    ;;
+
+stop)
+    echo -n $&quot;Shutting down $PROG: &quot;
+    if [ -f $pidfile ]
+    then
+        echo &quot;$(pgrep edns_dial|head -2)&quot; &gt; $kill_pid
+        for pid in `cat $kill_pid`
+        do
+            kill -9 $pid
+        done
+        RETVAR=$?
+        rm -f $pidfile
+    else
+        echo &quot;$(pgrep edns_dial|head -2)&quot; &gt; $kill_pid
+        for pid in `cat $kill_pid`
+        do
+            kill -9 $pid
+        done
+        RETVAR=$?
+    fi
+    [ $RETVAR -ne 0 ] &amp;&amp; exit 6
+    rm -f $LOCK_FILE
+    ;;
+
+restart|reload|force-reload)
+    $0 stop
+    $0 start
+    RETVAR=$?
+    ;;
+
+status)
+    status $EDNS_DIAL_BIN
+    RETVAR=$?
+    ;;
+*)
+    echo $&quot;Usage: $0 {start|stop|restart|reload|force-reload|status}&quot;
+    exit 2
+    ;;
+</code></pre><p>esac</p>
+<p>exit $RETVAR</p>
 
       
     </div>
@@ -620,7 +700,7 @@
             
               <a href="/archives/">
             
-                <span class="site-state-item-count">16</span>
+                <span class="site-state-item-count">18</span>
                 <span class="site-state-item-name">日志</span>
               </a>
             </div>
@@ -631,7 +711,7 @@
             
             <div class="site-state-item site-state-categories">
               <a href="/categories/index.html">
-                <span class="site-state-item-count">10</span>
+                <span class="site-state-item-count">11</span>
                 <span class="site-state-item-name">分类</span>
               </a>
             </div>
@@ -642,7 +722,7 @@
             
             <div class="site-state-item site-state-tags">
               <a href="/tags/index.html">
-                <span class="site-state-item-count">25</span>
+                <span class="site-state-item-count">27</span>
                 <span class="site-state-item-name">标签</span>
               </a>
             </div>
@@ -734,7 +814,7 @@
             
 
             
-              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#rpm-即软件包管理"><span class="nav-number">1.</span> <span class="nav-text">rpm 即软件包管理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#生成工作目录："><span class="nav-number">2.</span> <span class="nav-text">生成工作目录：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#目录分配："><span class="nav-number">3.</span> <span class="nav-text">目录分配：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#撰写SPEC文档-（最为核心）"><span class="nav-number">4.</span> <span class="nav-text">撰写SPEC文档 （最为核心）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#创建-安装-卸载"><span class="nav-number">5.</span> <span class="nav-text">创建 安装 卸载</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#特殊情况"><span class="nav-number">6.</span> <span class="nav-text">特殊情况</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#卸载出现此情况解决方案"><span class="nav-number">7.</span> <span class="nav-text">卸载出现此情况解决方案</span></a></li></ol></div>
+              <div class="post-toc-content"><ol class="nav"><li class="nav-item nav-level-2"><a class="nav-link" href="#rpm-即软件包管理"><span class="nav-number">1.</span> <span class="nav-text">rpm 即软件包管理</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#生成工作目录："><span class="nav-number">2.</span> <span class="nav-text">生成工作目录：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#目录分配："><span class="nav-number">3.</span> <span class="nav-text">目录分配：</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#撰写SPEC文档-（最为核心）"><span class="nav-number">4.</span> <span class="nav-text">撰写SPEC文档 （最为核心）</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#创建-安装-卸载"><span class="nav-number">5.</span> <span class="nav-text">创建 安装 卸载</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#特殊情况"><span class="nav-number">6.</span> <span class="nav-text">特殊情况</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#卸载出现此情况解决方案"><span class="nav-number">7.</span> <span class="nav-text">卸载出现此情况解决方案</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#spec-文件举例"><span class="nav-number">8.</span> <span class="nav-text">spec 文件举例</span></a></li><li class="nav-item nav-level-2"><a class="nav-link" href="#启动脚本"><span class="nav-number">9.</span> <span class="nav-text">启动脚本</span></a></li></ol></div>
             
 
           </div>

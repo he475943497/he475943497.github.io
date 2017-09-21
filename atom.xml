@@ -5,7 +5,7 @@
   <link href="/atom.xml" rel="self"/>
   
   <link href="http://heweiblog.top/"/>
-  <updated>2017-09-14T11:39:05.939Z</updated>
+  <updated>2017-09-20T02:14:07.404Z</updated>
   <id>http://heweiblog.top/</id>
   
   <author>
@@ -14,6 +14,353 @@
   </author>
   
   <generator uri="http://hexo.io/">Hexo</generator>
+  
+  <entry>
+    <title>linux内核之原子操作</title>
+    <link href="http://heweiblog.top/2017/09/20/linux%E5%86%85%E6%A0%B8%E4%B9%8B%E5%8E%9F%E5%AD%90%E6%93%8D%E4%BD%9C/"/>
+    <id>http://heweiblog.top/2017/09/20/linux内核之原子操作/</id>
+    <published>2017-09-20T02:11:44.000Z</published>
+    <updated>2017-09-20T02:14:07.404Z</updated>
+    
+    <content type="html"><![CDATA[<a id="more"></a>
+<p>在单处理器情况下，每条指令的执行都是原子性的，但在多处理器情况下，只有那些单独的读操作或写操作才是原子性的。为了弥补这一缺点，x86提供了附加的lock前缀，使带lock前缀的读修改写指令也能原子性执行。带lock前缀的指令在操作时会锁住总线，使自身的执行即使在多处理器间也是原子性执行的。xchg指令不带lock前缀也是原子性执行，也就是说xchg执行时默认会锁内存总线。原子性操作是线程间同步的基础，linux专门定义了一种只进行原子操作的类型atomic_t，并提供相关的原子读写调用API。本节就来分析这些原子操作在x86下的实现。</p>
+<ol>
+<li>typedef struct {  </li>
+<li>volatile int counter;  </li>
+<li>} atomic_t;<br>原子类型其实是int类型，只是禁止寄存器对其暂存。</li>
+<li>#define ATOMIC_INIT(i)  { (i) }<br>原子类型的初始化。32位x86平台下atomic API在arch/x86/include/asm/atomic_32.h中实现。</li>
+<li>static inline int atomic_read(const atomic_t *v)  </li>
+<li>{  </li>
+<li>return v-&gt;counter;  </li>
+<li>}  </li>
+<li></li>
+<li>static inline void atomic_set(atomic_t *v, int i)  </li>
+<li>{  </li>
+<li>v-&gt;counter = i;  </li>
+<li>}<br>单独的读操作或者写操作，在x86下都是原子性的。</li>
+<li>static inline void atomic_add(int i, atomic_t *v)  </li>
+<li>{  </li>
+<li>asm volatile(LOCK_PREFIX “addl %1,%0”  </li>
+<li>: “+m” (v-&gt;counter)  </li>
+<li>: “ir” (i));  </li>
+<li>}  </li>
+<li></li>
+<li>static inline void atomic_sub(int i, atomic_t *v)  </li>
+<li>{  </li>
+<li>asm volatile(LOCK_PREFIX “subl %1,%0”  </li>
+<li>: “+m” (v-&gt;counter)  </li>
+<li>: “ir” (i));  </li>
+<li>}<br>atomic_add和atomic_sub属于读修改写操作，实现时需要加lock前缀。</li>
+<li>static inline int atomic_sub_and_test(int i, atomic_t *v)  </li>
+<li>{  </li>
+<li>unsigned char c;  </li>
+<li></li>
+<li>asm volatile(LOCK_PREFIX “subl %2,%0; sete %1”  </li>
+<li>: “+m” (v-&gt;counter), “=qm” (c)  </li>
+<li>: “ir” (i) : “memory”);  </li>
+<li>return c;  </li>
+<li>}<br>atomic_sub_and_test执行完减操作后检查结果是否为0。</li>
+<li>static inline void atomic_inc(atomic_t *v)  </li>
+<li>{  </li>
+<li>asm volatile(LOCK_PREFIX “incl %0”  </li>
+<li>: “+m” (v-&gt;counter));  </li>
+<li>}  </li>
+<li></li>
+<li>static inline void atomic_dec(atomic_t *v)  </li>
+<li>{  </li>
+<li>asm volatile(LOCK_PREFIX “decl %0”  </li>
+<li>: “+m” (v-&gt;counter));  </li>
+<li>}<br>atomic_inc和atomic_dec是递增递减操作。</li>
+<li>static inline int atomic_dec_and_test(atomic_t *v)  </li>
+<li>{  </li>
+<li>unsigned char c;  </li>
+<li></li>
+<li>asm volatile(LOCK_PREFIX “decl %0; sete %1”  </li>
+<li>: “+m” (v-&gt;counter), “=qm” (c)  </li>
+<li>: : “memory”);  </li>
+<li>return c != 0;  </li>
+<li>}<br>atomic_dec_and_test在递减后检查结果是否为0。</li>
+<li>static inline int atomic_inc_and_test(atomic_t *v)  </li>
+<li>{  </li>
+<li>unsigned char c;  </li>
+<li></li>
+<li>asm volatile(LOCK_PREFIX “incl %0; sete %1”  </li>
+<li>: “+m” (v-&gt;counter), “=qm” (c)  </li>
+<li>: : “memory”);  </li>
+<li>return c != 0;  </li>
+<li>}<br>atomic_inc_and_test在递增后检查结果是否为0。</li>
+<li>static inline int atomic_add_negative(int i, atomic_t *v)  </li>
+<li>{  </li>
+<li>unsigned char c;  </li>
+<li></li>
+<li>asm volatile(LOCK_PREFIX “addl %2,%0; sets %1”  </li>
+<li>: “+m” (v-&gt;counter), “=qm” (c)  </li>
+<li>: “ir” (i) : “memory”);  </li>
+<li>return c;  </li>
+<li>}<br>atomic_add_negative在加操作后检查结果是否为负数。</li>
+<li>static inline int atomic_add_return(int i, atomic_t *v)  </li>
+<li>{  </li>
+<li>int __i;  </li>
+<li>#ifdef CONFIG_M386   </li>
+<li>unsigned long flags;  </li>
+<li>if (unlikely(boot_cpu_data.x86 &lt;= 3))  </li>
+<li>goto no_xadd;  </li>
+<li>#endif   </li>
+<li>/<em> Modern 486+ processor </em>/  </li>
+<li>__i = i;  </li>
+<li>asm volatile(LOCK_PREFIX “xaddl %0, %1”  </li>
+<li>: “+r” (i), “+m” (v-&gt;counter)  </li>
+<li>: : “memory”);  </li>
+<li>return i + __i;  </li>
+<li></li>
+<li>#ifdef CONFIG_M386   </li>
+<li>no_xadd: /<em> Legacy 386 processor </em>/  </li>
+<li>local_irq_save(flags);  </li>
+<li>__i = atomic_read(v);  </li>
+<li>atomic_set(v, i + __i);  </li>
+<li>local_irq_restore(flags);  </li>
+<li>return i + __i;  </li>
+<li>#endif   </li>
+<li>}<br>atomic_add_return 不仅执行加操作，而且把相加的结果返回。它是通过xadd这一指令实现的。</li>
+<li>static inline int atomic_sub_return(int i, atomic_t *v)  </li>
+<li>{  </li>
+<li>return atomic_add_return(-i, v);  </li>
+<li>}<br>atomic_sub_return 不仅执行减操作，而且把相减的结果返回。它是通过atomic_add_return实现的。</li>
+<li>static inline int atomic_cmpxchg(atomic_t *v, int old, int new)  </li>
+<li>{  </li>
+<li>return cmpxchg(&amp;v-&gt;counter, old, new);  </li>
+<li>}  </li>
+<li></li>
+<li>#define cmpxchg(ptr, o, n)                      \   </li>
+<li>((<strong>typeof</strong>(*(ptr)))__cmpxchg((ptr), (unsigned long)(o),   \  </li>
+<li>(unsigned long)(n),      \  </li>
+<li>sizeof(*(ptr))))  </li>
+<li></li>
+<li>static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,  </li>
+<li>unsigned long new, int size)  </li>
+<li>{  </li>
+<li>unsigned long prev;  </li>
+<li>switch (size) {  </li>
+<li>case 1:  </li>
+<li>asm volatile(LOCK_PREFIX “cmpxchgb %b1,%2”  </li>
+<li>: “=a”(prev)  </li>
+<li>: “q”(new), “m”(*__xg(ptr)), “0”(old)  </li>
+<li>: “memory”);  </li>
+<li>return prev;  </li>
+<li>case 2:  </li>
+<li>asm volatile(LOCK_PREFIX “cmpxchgw %w1,%2”  </li>
+<li>: “=a”(prev)  </li>
+<li>: “r”(new), “m”(*__xg(ptr)), “0”(old)  </li>
+<li>: “memory”);  </li>
+<li>return prev;  </li>
+<li>case 4:  </li>
+<li>asm volatile(LOCK_PREFIX “cmpxchgl %k1,%2”  </li>
+<li>: “=a”(prev)  </li>
+<li>: “r”(new), “m”(*__xg(ptr)), “0”(old)  </li>
+<li>: “memory”);  </li>
+<li>return prev;  </li>
+<li>case 8:  </li>
+<li>asm volatile(LOCK_PREFIX “cmpxchgq %1,%2”  </li>
+<li>: “=a”(prev)  </li>
+<li>: “r”(new), “m”(*__xg(ptr)), “0”(old)  </li>
+<li>: “memory”);  </li>
+<li>return prev;  </li>
+<li>}  </li>
+<li>return old;  </li>
+<li>}<br>atomic_cmpxchg是由cmpxchg指令完成的。它把旧值同atomic_t类型的值相比较，如果相同，就把新值存入atomic_t类型的值中，返回atomic_t类型变量中原有的值。</li>
+<li>static inline int atomic_xchg(atomic_t *v, int new)  </li>
+<li>{  </li>
+<li>return xchg(&amp;v-&gt;counter, new);  </li>
+<li>}  </li>
+<li></li>
+<li>#define xchg(ptr, v)                            \   </li>
+<li>((<strong>typeof</strong>(<em>(ptr)))__xchg((unsigned long)(v), (ptr), sizeof(</em>(ptr))))  </li>
+<li></li>
+<li>static inline unsigned long __xchg(unsigned long x, volatile void *ptr,  </li>
+<li>int size)  </li>
+<li>{  </li>
+<li>switch (size) {  </li>
+<li>case 1:  </li>
+<li>asm volatile(“xchgb %b0,%1”  </li>
+<li>: “=q” (x)  </li>
+<li>: “m” (*__xg(ptr)), “0” (x)  </li>
+<li>: “memory”);  </li>
+<li>break;  </li>
+<li>case 2:  </li>
+<li>asm volatile(“xchgw %w0,%1”  </li>
+<li>: “=r” (x)  </li>
+<li>: “m” (*__xg(ptr)), “0” (x)  </li>
+<li>: “memory”);  </li>
+<li>break;  </li>
+<li>case 4:  </li>
+<li>asm volatile(“xchgl %k0,%1”  </li>
+<li>: “=r” (x)  </li>
+<li>: “m” (*__xg(ptr)), “0” (x)  </li>
+<li>: “memory”);  </li>
+<li>break;  </li>
+<li>case 8:  </li>
+<li>asm volatile(“xchgq %0,%1”  </li>
+<li>: “=r” (x)  </li>
+<li>: “m” (*__xg(ptr)), “0” (x)  </li>
+<li>: “memory”);  </li>
+<li>break;  </li>
+<li>}  </li>
+<li>return x;  </li>
+<li>}<br>atomic_xchg则是将新值存入atomic_t类型的变量，并将变量的旧值返回。它使用xchg指令实现。</li>
+<li>/** </li>
+<li><ul>
+<li>atomic_add_unless - add unless the number is already a given value </li>
+</ul>
+</li>
+<li><ul>
+<li>@v: pointer of type atomic_t </li>
+</ul>
+</li>
+<li><ul>
+<li>@a: the amount to add to v… </li>
+</ul>
+</li>
+<li><ul>
+<li>@u: …unless v is equal to u. </li>
+</ul>
+</li>
+<li>* </li>
+<li><ul>
+<li>Atomically adds @a to @v, so long as @v was not already @u. </li>
+</ul>
+</li>
+<li><ul>
+<li>Returns non-zero if @v was not @u, and zero otherwise. </li>
+</ul>
+</li>
+<li>*/  </li>
+<li>static inline int atomic_add_unless(atomic_t *v, int a, int u)  </li>
+<li>{  </li>
+<li>int c, old;  </li>
+<li>c = atomic_read(v);  </li>
+<li>for (;;) {  </li>
+<li>if (unlikely(c == (u)))  </li>
+<li>break;  </li>
+<li>old = atomic_cmpxchg((v), c, c + (a));  </li>
+<li>if (likely(old == c))  </li>
+<li>break;  </li>
+<li>c = old;  </li>
+<li>}  </li>
+<li>return c != (u);  </li>
+<li>}<br>atomic_add_unless的功能比较特殊。它检查v是否等于u，如果不是则把v的值加上a，返回值表示相加前v是否等于u。因为在atomic_read和atomic_cmpxchg中间可能有其它的写操作，所以要循环检查自己的值是否被写进去。</li>
+<li>#define atomic_inc_not_zero(v) atomic_add_unless((v), 1, 0)   </li>
+<li></li>
+<li>#define atomic_inc_return(v)  (atomic_add_return(1, v))   </li>
+<li>#define atomic_dec_return(v)  (atomic_sub_return(1, v))<br>atomic_inc_not_zero在v值不是0时加1。<br>atomic_inc_return对v值加1，并返回相加结果。<br>atomic_dec_return对v值减1，并返回相减结果。</li>
+<li>#define atomic_clear_mask(mask, addr)               \   </li>
+<li>asm volatile(LOCK_PREFIX “andl %0,%1”           \  </li>
+<li>: : “r” (~(mask)), “m” (*(addr)) : “memory”)<br>atomic_clear_mask清除变量某些位。</li>
+<li>#define atomic_set_mask(mask, addr)             \   </li>
+<li>asm volatile(LOCK_PREFIX “orl %0,%1”                \  </li>
+<li>: : “r” (mask), “m” (*(addr)) : “memory”)<br>atomic_set_mask将变量的某些位置位。</li>
+<li>/<em> Atomic operations are already serializing on x86 </em>/  </li>
+<li>#define smp_mb__before_atomic_dec() barrier()   </li>
+<li>#define smp_mb__after_atomic_dec()  barrier()   </li>
+<li>#define smp_mb__before_atomic_inc() barrier()   </li>
+<li>#define smp_mb__after_atomic_inc()  barrier()<br>因为x86的atomic操作大多使用原子指令或者带lock前缀的指令。带lock前缀的指令执行前会完成之前的读写操作，对于原子操作来说不会受之前对同一位置的读写操作，所以这里只是用空操作barrier()代替。barrier()的作用相当于告诉编译器这里有一个内存屏障，放弃在寄存器中的暂存值，重新从内存中读入。<br>本节的atomic_t类型操作是最基础的，为了介绍下面的内容，必须先介绍它。如果可以使用atomic_t类型代替临界区操作，也可以加快不少速度。</li>
+</ol>
+]]></content>
+    
+    <summary type="html">
+    
+      在任何处理器平台下，都会有一些原子性操作，供操作系统使用，我们这里只讲x86下面的。
+    
+    </summary>
+    
+      <category term="linux内核" scheme="http://heweiblog.top/categories/linux%E5%86%85%E6%A0%B8/"/>
+    
+    
+      <category term="linux基础" scheme="http://heweiblog.top/tags/linux%E5%9F%BA%E7%A1%80/"/>
+    
+      <category term="atomic" scheme="http://heweiblog.top/tags/atomic/"/>
+    
+      <category term="linux内核" scheme="http://heweiblog.top/tags/linux%E5%86%85%E6%A0%B8/"/>
+    
+  </entry>
+  
+  <entry>
+    <title>我的git使用</title>
+    <link href="http://heweiblog.top/2017/09/19/%E6%88%91%E7%9A%84git%E4%BD%BF%E7%94%A8/"/>
+    <id>http://heweiblog.top/2017/09/19/我的git使用/</id>
+    <published>2017-09-19T02:48:43.000Z</published>
+    <updated>2017-09-19T10:20:18.758Z</updated>
+    
+    <content type="html"><![CDATA[<a id="more"></a>
+<h2 id="引言"><a href="#引言" class="headerlink" title="引言"></a>引言</h2><h2 id="安装git"><a href="#安装git" class="headerlink" title="安装git"></a>安装git</h2><p>yum apt 均可</p>
+<h2 id="Git-add"><a href="#Git-add" class="headerlink" title="Git add"></a>Git add</h2><p>将当前工作目录中更改或者新增的文件加入到Git的索引中，加入到Git的索引中就表示记入了版本历史中，<br>这也是提交之前所需要执行的一步。<br>可以递归添加，即如果后面跟的是一个目录作为参数，则会递归添加整个目录中的所有子目录和文件。例如：<br>       git add dir1 （ 添加dir1这个目录，目录下的所有文件都被加入 ）<br>       Git add f1 f2 （ 添加f1，f2文件）<br>       git add .      ( 添加当前目录下的所有文件和子目录 ) </p>
+<h2 id="Git-commit"><a href="#Git-commit" class="headerlink" title="Git commit"></a>Git commit</h2><p>提交当前工作目录的修改内容。<br>直接调用git commit命令，会提示填写注释。通过如下方式在命令行就填写提交注释：<br>git commit -m “Initial commit of gittutor reposistory”。 注意，和CVS不同，git的提交注释必须不能为空，否则就会提交失败。<br>git commit还有一个 -a的参数，可以将那些没有通过git add标识的变化一并强行提交，但是不建议使用这种方式。<br>每一次提交，git就会为全局代码建立一个唯一的commit标识代码，用户可以通过git reset命令恢复到任意一次提交时的代码。<br>git commit –-amend –m “message” （在一个commit id上不断修改提交的内容） </p>
+<h2 id="Git-status"><a href="#Git-status" class="headerlink" title="Git status"></a>Git status</h2><p>查看版本库的状态。可以得知哪些文件发生了变化，哪些文件还没有添加到git库中等等。<br>建议每次commit前都要通过该命令确认库状态。<br>最常见的误操作是， 修改了一个文件， 没有调用git add通知git库该文件已经发生了变化就直接调用commit操作，<br>从而导致该文件并没有真正的提交。这时如果开发者以为已经提交了该文件，就继续修改甚至删除这个文件，<br>那么修改的内容就没有通过版本管理起来。如果每次在 提交前，使用git status查看一下，就可以发现这种错误。<br>因此，如果调用了git status命令，一定要格外注意那些提示为 “Changed but not updated:”的文件。<br>这些文件都是与上次commit相比发生了变化，但是却没有通过git add标识的文件。</p>
+<h2 id="初始化一个Git仓库，使用git-init命令。"><a href="#初始化一个Git仓库，使用git-init命令。" class="headerlink" title="初始化一个Git仓库，使用git init命令。"></a>初始化一个Git仓库，使用git init命令。</h2><p>添加文件到Git仓库，分两步：<br>第一步，使用命令git add <file>，注意，可反复多次使用，添加多个文件；<br>第二步，使用命令git commit，完成。</file></p>
+<p>要随时掌握工作区的状态，使用git status命令。<br>如果git status告诉你有文件被修改过，用git diff可以查看修改内容</p>
+<h2 id="Git必须知道当前版本是哪个版本，"><a href="#Git必须知道当前版本是哪个版本，" class="headerlink" title="Git必须知道当前版本是哪个版本，"></a>Git必须知道当前版本是哪个版本，</h2><p>在Git中，用HEAD表示当前版本，<br>也就是最新的提交3628164…882e1e0（注意我的提交ID和你的肯定不一样），<br>上一个版本就是HEAD^，上上一个版本就是HEAD^^，当然往上100个版本写100个^比较容易数不过来，所以写成HEAD~100。<br>git reset –hard HEAD^</p>
+<p>Git的版本回退速度非常快，因为Git在内部有个指向当前版本的HEAD指针，当你回退版本的时候，Git仅仅是把HEAD从指向append GPL<br>HEAD指向的版本就是当前版本，因此，Git允许我们在版本的历史之间穿梭，使用命令git reset –hard commit_id。<br>穿梭前，用git log可以查看提交历史，以便确定要回退到哪个版本。<br>要重返未来，用git reflog查看命令历史，以便确定要回到未来的哪个版本。</p>
+<p>git add命令实际上就是把要提交的所有修改放到暂存区（Stage），<br>然后，执行git commit就可以一次性把暂存区的所有修改提交到分支。git commit只负责把暂存区的修改提交了</p>
+<p>git checkout – file可以丢弃工作区的修改：<br>命令git checkout – readme.txt意思就是，把readme.txt文件在工作区的修改全部撤销，这里有两种情况：<br>一种是readme.txt自修改后还没有被放到暂存区，现在，撤销修改就回到和版本库一模一样的状态；<br>一种是readme.txt已经添加到暂存区后，又作了修改，现在，撤销修改就回到添加到暂存区后的状态。<br>总之，就是让这个文件回到最近一次git commit或git add时的状态。</p>
+<p>Git同样告诉我们，用命令git reset HEAD file可以把暂存区的修改撤销掉（unstage），重新放回工作区：<br>场景1：当你改乱了工作区某个文件的内容，想直接丢弃工作区的修改时，用命令git checkout – file。<br>场景2：当你不但改乱了工作区某个文件的内容，还添加到了暂存区时，想丢弃修改，<br>分两步，第一步用命令git reset HEAD file，就回到了场景1，第二步按场景1操作。</p>
+<p>一般情况下，你通常直接在文件管理器中把没用的文件删了，或者用rm命令删了：<br>$ rm test.txt<br>这个时候，Git知道你删除了文件，因此，工作区和版本库就不一致了，git status命令会立刻告诉你哪些文件被删除了：<br>现在你有两个选择，一是确实要从版本库中删除该文件，那就用命令git rm删掉，并且git commit<br>现在，文件就从版本库中被删除了。<br>另一种情况是删错了，因为版本库里还有呢，所以可以很轻松地把误删的文件恢复到最新版本：<br>$ git checkout – test.txt<br>git checkout其实是用版本库里的版本替换工作区的版本，无论工作区是修改还是删除，都可以“一键还原”。</p>
+<h2 id="关联"><a href="#关联" class="headerlink" title="关联"></a>关联</h2><p>要关联一个远程库，使用命令git remote add origin git@server-name:path/repo-name.git；<br>关联后，使用命令git push -u origin master第一次推送master分支的所有内容；<br>此后，每次本地提交后，只要有必要，就可以使用命令git push origin master推送最新修改</p>
+<h2 id="克隆"><a href="#克隆" class="headerlink" title="克隆"></a>克隆</h2><p>要克隆一个仓库，首先必须知道仓库的地址，然后使用git clone命令克隆。<br>git clone git@github.com:michaelliao/gitskills.git<br>Git支持多种协议，包括https，但通过ssh支持的原生git协议速度最快。</p>
+<h2 id="分支"><a href="#分支" class="headerlink" title="分支"></a>分支</h2><p>查看分支：git branch<br>创建分支：git branch <name><br>切换分支：git checkout <name><br>创建+切换分支：git checkout -b <name><br>合并某分支到当前分支：git merge <name><br>删除分支：git branch -d <name></name></name></name></name></name></p>
+<h2 id="冲突-合并"><a href="#冲突-合并" class="headerlink" title="冲突 合并"></a>冲突 合并</h2><p>当Git无法自动合并分支时，就必须首先解决冲突。解决冲突后，再提交，合并完成。<br>用git log –graph命令可以看到分支合并图。</p>
+<p>Git分支十分强大，在团队开发中应该充分应用。<br>合并分支时，加上–no-ff参数就可以用普通模式合并，合并后的历史有分支，能看出来曾经做过合并，<br>而fast forward合并就看不出来曾经做过合并。</p>
+<h2 id="git-stash"><a href="#git-stash" class="headerlink" title="git stash"></a>git stash</h2><p>修复bug时，我们会通过创建新的bug分支进行修复，然后合并，最后删除；<br>当手头工作没有完成时，先把工作现场git stash一下，然后去修复bug，修复后，再git stash pop，回到工作现场。</p>
+<h2 id="开发一个新feature，最好新建一个分支；"><a href="#开发一个新feature，最好新建一个分支；" class="headerlink" title="开发一个新feature，最好新建一个分支；"></a>开发一个新feature，最好新建一个分支；</h2><p>如果要丢弃一个没有被合并过的分支，可以通过git branch -D <name>强行删除。</name></p>
+<h2 id="查看远程库信息，使用git-remote-v；"><a href="#查看远程库信息，使用git-remote-v；" class="headerlink" title="查看远程库信息，使用git remote -v；"></a>查看远程库信息，使用git remote -v；</h2><p>本地新建的分支如果不推送到远程，对其他人就是不可见<br>从本地推送分支，使用git push origin branch-name，如果推送失败，先用git pull抓取远程的新提交；<br>在本地创建和远程分支对应的分支，使用git checkout -b branch-name origin/branch-name，本地和远程分支的名称最好一致；<br>建立本地分支和远程分支的关联，使用git branch –set-upstream branch-name origin/branch-name；<br>从远程抓取分支，使用git pull，如果有冲突，要先处理冲突。</p>
+<h1 id="我的git使用"><a href="#我的git使用" class="headerlink" title="我的git使用"></a>我的git使用</h1><p>git client端需要在～/.ssh/config文件中添加如下信息：<br>host 192.168.8.253<br>port 61112</p>
+<p>自己新建一个目录在该目录下<br>git clone git@192.168.8.253:yprobe-c.git</p>
+<p>切到目标目录下<br>[heweiwei@heweiwei work]$ ls<br>yprobe-c<br>[heweiwei@heweiwei work]$ cd yprobe-c/</p>
+<h2 id="查看处于那个分支"><a href="#查看处于那个分支" class="headerlink" title="查看处于那个分支"></a>查看处于那个分支</h2><p>[heweiwei@heweiwei yprobe-c]$ git branch</p>
+<ul>
+<li>master<br>remotes/origin/HEAD -&gt; origin/master<br>remotes/origin/enterprise<br>remotes/origin/master</li>
+</ul>
+<p>[heweiwei@heweiwei yprobe-c]$ </p>
+<h2 id="切换分支"><a href="#切换分支" class="headerlink" title="切换分支"></a>切换分支</h2><p>[heweiwei@heweiwei yprobe-c]$ git checkout enterprise    /<br>Branch enterprise set up to track remote branch enterprise from origin.</p>
+<p>Switched to a new branch ‘enterprise’<br>[heweiwei@heweiwei yprobe-c]$<br>[heweiwei@heweiwei yprobe-c]$ </p>
+<h2 id="查看远程所有分支"><a href="#查看远程所有分支" class="headerlink" title="查看远程所有分支"></a>查看远程所有分支</h2><p>[heweiwei@heweiwei yprobe-c]$ git branch -a </p>
+<ul>
+<li>enterprise<br>master</li>
+</ul>
+<h2 id="查看状态"><a href="#查看状态" class="headerlink" title="查看状态"></a>查看状态</h2><p>[heweiwei@heweiwei yprobe-c]$ git status<br>On branch enterprise</p>
+<h2 id="接收数据"><a href="#接收数据" class="headerlink" title="接收数据"></a>接收数据</h2><p>[heweiwei@heweiwei yprobe-c]$ git pull<br>remote: Counting objects: 7, done.<br>remote: Compressing objects: 100% (3/3), done.<br>remote: Total 4 (delta 2), reused 0 (delta 0)<br>Unpacking objects: 100% (4/4), done.<br>From 192.168.8.253:yprobe-c<br>   ccf10bf..9b609d8  enterprise -&gt; origin/enterprise<br>Updating ccf10bf..9b609d8<br>Fast-forward<br> dial_cpp/Dial_server.cpp |   88 ++++++++++++++++++++++++++++++++++++++++++++-<br> 1 files changed, 86 insertions(+), 2 deletions(-)</p>
+<h2 id="保存现场"><a href="#保存现场" class="headerlink" title="保存现场"></a>保存现场</h2><p>git stash     修改了东西  暂存起来</p>
+<h2 id="我的提交："><a href="#我的提交：" class="headerlink" title="我的提交："></a>我的提交：</h2><p>[heweiwei@heweiwei dial]$ git add Dial_epoll.cpp<br>[heweiwei@heweiwei yprobe-c]$ git commit -m “repeat assignment”<br>[heweiwei@heweiwei yprobe-c]$ git push<br>[heweiwei@heweiwei yprobe-c]$ git log<br>commit 13fb4c131309358ce0099295f3a34a3e0a873f6e<br>Author: heweiwei <a href="&#x6d;&#x61;&#105;&#108;&#116;&#x6f;&#58;&#x68;&#101;&#x77;&#101;&#x69;&#119;&#101;&#105;&#x40;&#x68;&#101;&#x77;&#x65;&#105;&#119;&#101;&#x69;&#x2e;&#40;&#x6e;&#x6f;&#110;&#x65;&#41;">&#x68;&#101;&#x77;&#101;&#x69;&#119;&#101;&#105;&#x40;&#x68;&#101;&#x77;&#x65;&#105;&#119;&#101;&#x69;&#x2e;&#40;&#x6e;&#x6f;&#110;&#x65;&#41;</a><br>Date:   Wed Mar 29 10:41:12 2017 +0800</p>
+<p>repeat assignment</p>
+<h2 id="创建分支并切换到该分支"><a href="#创建分支并切换到该分支" class="headerlink" title="创建分支并切换到该分支"></a>创建分支并切换到该分支</h2><p>[heweiwei@heweiwei yprobe-c]$ git checkout -b heweiwei_dial<br>此命令相当于 git branch heweiwei_dial     git checkout heweiwei_dial</p>
+<h2 id="把本地分支推送到远程分支"><a href="#把本地分支推送到远程分支" class="headerlink" title="把本地分支推送到远程分支"></a>把本地分支推送到远程分支</h2><p>[heweiwei@heweiwei yprobe-c]$ git push origin heweiwei_dial</p>
+<h2 id="删除远程分支"><a href="#删除远程分支" class="headerlink" title="删除远程分支"></a>删除远程分支</h2><p>git push origin :heweiwei_dial 注意origin后面的空格</p>
+<p>（只有合并之后）才可以用此命令删除本地分支（因为创建本地分支的目的就是为了开发合并）<br>[heweiwei@heweiwei yprobe-c]$ git branch -d heweiwei_dial<br>error: The branch ‘heweiwei_dial’ is not fully merged.<br>If you are sure you want to delete it, run ‘git branch -D heweiwei_dial’.</p>
+<h2 id="强制删除本地分支（没有合并的分支也删除）"><a href="#强制删除本地分支（没有合并的分支也删除）" class="headerlink" title="强制删除本地分支（没有合并的分支也删除）"></a>强制删除本地分支（没有合并的分支也删除）</h2><p>[heweiwei@heweiwei yprobe-c]$ git branch -D heweiwei_dial</p>
+<h2 id="合并分支-用-git-merge-命令来进行合并"><a href="#合并分支-用-git-merge-命令来进行合并" class="headerlink" title="合并分支  用 git merge 命令来进行合并"></a>合并分支  用 git merge 命令来进行合并</h2><p>[heweiwei@heweiwei yprobe-c]$ git add edns_dial-1.1.1.8/*<br>[heweiwei@heweiwei yprobe-c]$ git commit -m “edns_dial-1.1.1.8 have three log”<br>[heweiwei@heweiwei yprobe-c]$ git checkout enterprise<br>[heweiwei@heweiwei yprobe-c]$ git merge heweiwei_dial<br>[heweiwei@heweiwei yprobe-c]$ git branch -d heweiwei_dial<br>Deleted branch heweiwei_dial (was 39dc1df).<br>[heweiwei@heweiwei yprobe-c]$ git push         // 推到远程服务器<br>[heweiwei@heweiwei yprobe-c]$ git push origin master.dev        // 推到远程服务器具体某个分支</p>
+<h2 id="回退到上一个版本"><a href="#回退到上一个版本" class="headerlink" title="回退到上一个版本"></a>回退到上一个版本</h2><p>[heweiwei@heweiwei yprobe-c]$ git reset –hard HEAD^<br>HEAD is now at 1475127 打rpm包和集成服务自启动<br>上上一个版本就是HEAD^^，当然往上100个版本写100个^比较容易数不过来，所以写成HEAD~100</p>
+<p>git log –pretty=oneline<br>[heweiwei@heweiwei yprobe-c]$ git log –pretty=oneline<br>147512720038d1a40776abae7d119565c36c4451 打rpm包和集成服务自启动<br>9623de89e686da18311aa26312ad43be1eb07f91 反向代理的https方式拨测的指定端口改变<br>635c41264d788acaae9530306611032fc7b74bfa Fix Makefile: libthrift.a (v-0.9.0)<br>80126458120dd8c3499af945b45572b1117e7272 拨测频繁切换，thrift通信架构<br>只要命令行窗口还没有被关掉，你就可以顺着往上找啊找啊，找到那个append GPL的commit id是3628164…，</p>
+<h2 id="回退到你想回的版本"><a href="#回退到你想回的版本" class="headerlink" title="回退到你想回的版本"></a>回退到你想回的版本</h2><p>[heweiwei@heweiwei dial_cpp]$ git reset –hard 1475127<br>HEAD is now at 1475127 打rpm包和集成服务自启动<br>HEAD指向的版本就是当前版本，因此，Git允许我们在版本的历史之间穿梭，使用命令git reset –hard commit_id。<br>穿梭前，用git log可以查看提交历史，以便确定要回退到哪个版本。<br>要重返未来，用git reflog查看命令历史，以便确定要回到未来的哪个版本。</p>
+<p>若要查看各个分支最后一个提交对象的信息，运行 git branch -v：</p>
+<p>将远程版本库回滚到上一个版本  或者回滚到以前某个版本</p>
+<p>git reset –hard HEAD^    或者 git reset –hard “commit ID”<br>git push origin master -f</p>
+<h2 id="git-clone-git-192-168-8-253-yrdns-git-递归代码"><a href="#git-clone-git-192-168-8-253-yrdns-git-递归代码" class="headerlink" title="git clone git@192.168.8.253:yrdns.git 递归代码"></a>git clone git@192.168.8.253:yrdns.git 递归代码</h2><h2 id="git-clone-ssh-git-192-168-8-253-61112-clib-git-clib库"><a href="#git-clone-ssh-git-192-168-8-253-61112-clib-git-clib库" class="headerlink" title="git clone ssh://git@192.168.8.253:61112/clib.git  clib库"></a>git clone ssh://git@192.168.8.253:61112/clib.git  clib库</h2><p>增加了授权功能<br>[heweiwei@heweiwei yrdnsl]$ git pull origin master.dev<br>From 192.168.8.253:yrdns</p>
+<ul>
+<li>branch            master.dev -&gt; FETCH_HEAD<br>Updating 536db80..83eafe8<br>Fast-forward<br>.gitignore             |    3 +<br>Makefile.in.temp       |    1 +<br>conf/yrdns.conf        |   21 +-<br>include/yr_cache.h     |    4 +-<br>include/yr_config.h    |   92 ++-<br>include/yr_hash.h      |    1 +<br>include/yr_ini.h       |    2 +-<br>include/yr_job.h       |    1 +<br>include/yr_log.h       |    4 +<br>include/yr_packet.h    |    2 +<br>include/yr_recursing.h |    2 +<br>include/yr_stat.h      |    5 +<br>include/zone.h         |  528 +++++++<br>src/Makefile           |    2 +-<br>src/yr_cache.c         |  121 +-<br>src/yr_config.c        | 1281 ++++++++++++++++-<br>src/yr_forwarder.c     |    2 +-<br>src/yr_hash.c          |    9 +-<br>src/yr_iphash.c        |    3 +-<br>src/yr_iterator.c      |  117 +-<br>src/yr_job.c           |  232 ++–<br>src/yr_log.c           |  111 ++-<br>src/yr_recursing.c     |   54 +-<br>src/yr_thrift.c        |   10 +-<br>src/yr_view.c          |    4 +-<br>src/zone.c             | 3747 ++++++++++++++++++++++++++++++++++++++++++++++++<br>version                |    2 +-<br>27 files changed, 6049 insertions(+), 312 deletions(-)<br>create mode 100644 include/zone.h<br>create mode 100644 src/zone.c</li>
+</ul>
+]]></content>
+    
+    <summary type="html">
+    
+      &lt;a id=&quot;more&quot;&gt;&lt;/a&gt;
+&lt;h2 id=&quot;引言&quot;&gt;&lt;a href=&quot;#引言&quot; class=&quot;headerlink&quot; title=&quot;引言&quot;&gt;&lt;/a&gt;引言&lt;/h2&gt;&lt;h2 id=&quot;安装git&quot;&gt;&lt;a href=&quot;#安装git&quot; class=&quot;headerlink&quot; titl
+    
+    </summary>
+    
+      <category term="开发工具" scheme="http://heweiblog.top/categories/%E5%BC%80%E5%8F%91%E5%B7%A5%E5%85%B7/"/>
+    
+    
+      <category term="git" scheme="http://heweiblog.top/tags/git/"/>
+    
+  </entry>
   
   <entry>
     <title>linux内核之list.h</title>
@@ -73,14 +420,15 @@
     <link href="http://heweiblog.top/2017/09/12/linux%E5%8E%8B%E7%BC%A9%E5%91%BD%E4%BB%A4/"/>
     <id>http://heweiblog.top/2017/09/12/linux压缩命令/</id>
     <published>2017-09-12T01:41:44.000Z</published>
-    <updated>2017-09-12T01:50:47.410Z</updated>
+    <updated>2017-09-21T02:46:45.793Z</updated>
     
     <content type="html"><![CDATA[<a id="more"></a>
-<h2 id="举例"><a href="#举例" class="headerlink" title="举例"></a>举例</h2><p>[root@www ~]# tar [-j|-z] [cv] [-f 创建的档名] filename… &lt;==打包与压缩<br>[root@www ~]# tar [-j|-z] [tv] [-f 创建的档名]             &lt;==察看档名<br>[root@www ~]# tar [-j|-z] [xv] [-f 创建的档名] [-C 目录]   &lt;==解压缩</p>
-<h2 id="选项与参数："><a href="#选项与参数：" class="headerlink" title="选项与参数："></a>选项与参数：</h2><p>-c  ：创建打包文件，可搭配 -v 来察看过程中被打包的档名(filename)<br>-t  ：察看打包文件的内容含有哪些档名，重点在察看『档名』就是了；<br>-x  ：解打包或解压缩的功能，可以搭配 -C (大写) 在特定目录解开<br>      特别留意的是， -c, -t, -x 不可同时出现在一串命令列中。<br>-j  ：透过 bzip2 的支持进行压缩/解压缩：此时档名最好为 <em>.tar.bz2<br>-z  ：透过 gzip  的支持进行压缩/解压缩：此时档名最好为 </em>.tar.gz<br>-v  ：在压缩/解压缩的过程中，将正在处理的档名显示出来！<br>-f filename：-f 后面要立刻接要被处理的档名！建议 -f 单独写一个选项罗！<br>-C 目录    ：这个选项用在解压缩，若要在特定目录解压缩，可以使用这个选项。</p>
-<h2 id="其他后续练习会使用到的选项介绍："><a href="#其他后续练习会使用到的选项介绍：" class="headerlink" title="其他后续练习会使用到的选项介绍："></a>其他后续练习会使用到的选项介绍：</h2><p>-p  ：保留备份数据的原本权限与属性，常用於备份(-c)重要的配置档<br>-P  ：保留绝对路径，亦即允许备份数据中含有根目录存在之意；<br>–exclude=FILE：在压缩的过程中，不要将 FILE 打包！ </p>
-<h2 id="其实最简单的使用-tar-就只要记忆底下的方式即可："><a href="#其实最简单的使用-tar-就只要记忆底下的方式即可：" class="headerlink" title="其实最简单的使用 tar 就只要记忆底下的方式即可："></a>其实最简单的使用 tar 就只要记忆底下的方式即可：</h2><p>  ● 压　缩：tar -jcv -f filename.tar.bz2 要被压缩的文件或目录名称<br>  ● 查　询：tar -jtv -f filename.tar.bz2<br>  ● 解压缩：tar -jxv -f filename.tar.bz2 -C 欲解压缩的目录<br>  ● 压    缩：tar -zcvf <em>.tar.gz  dir/file<br>  ● 解压缩 ：tar -zxvf  </em>.tar.gz</p>
-<h2 id="更多压缩详解参考地址"><a href="#更多压缩详解参考地址" class="headerlink" title="更多压缩详解参考地址"></a><a href="http://cn.linux.vbird.org/linux_basic/0240tarcompress.php" target="_blank" rel="external">更多压缩详解参考地址</a></h2><h2 id="更多举例"><a href="#更多举例" class="headerlink" title="更多举例"></a>更多举例</h2><p>01-.tar格式<br>解包：[＊＊＊＊＊＊＊]$ tar xvf FileName.tar<br>打包：[＊＊＊＊＊＊＊]$ tar cvf FileName.tar DirName（注：tar是打包，不是压缩！）</p>
+<p>[root@www ~]# tar [-j|-z] [cv] [-f 创建的档名] filename… &lt;==打包与压缩<br>[root@www ~]# tar [-j|-z] [tv] [-f 创建的档名]             &lt;==察看档名<br>[root@www ~]# tar [-j|-z] [xv] [-f 创建的档名] [-C 目录]   &lt;==解压缩<br>选项与参数：<br>-c  ：创建打包文件，可搭配 -v 来察看过程中被打包的档名(filename)<br>-t  ：察看打包文件的内容含有哪些档名，重点在察看『档名』就是了；<br>-x  ：解打包或解压缩的功能，可以搭配 -C (大写) 在特定目录解开<br>      特别留意的是， -c, -t, -x 不可同时出现在一串命令列中。<br>-j  ：透过 bzip2 的支持进行压缩/解压缩：此时档名最好为 <em>.tar.bz2<br>-z  ：透过 gzip  的支持进行压缩/解压缩：此时档名最好为 </em>.tar.gz<br>-v  ：在压缩/解压缩的过程中，将正在处理的档名显示出来！<br>-f filename：-f 后面要立刻接要被处理的档名！建议 -f 单独写一个选项罗！<br>-C 目录    ：这个选项用在解压缩，若要在特定目录解压缩，可以使用这个选项。</p>
+<p>其他后续练习会使用到的选项介绍：<br>-p  ：保留备份数据的原本权限与属性，常用於备份(-c)重要的配置档<br>-P  ：保留绝对路径，亦即允许备份数据中含有根目录存在之意；<br>–exclude=FILE：在压缩的过程中，不要将 FILE 打包！ </p>
+<p>其实最简单的使用 tar 就只要记忆底下的方式即可：<br>  ● 压　缩：tar -jcv -f filename.tar.bz2 要被压缩的文件或目录名称<br>  ● 查　询：tar -jtv -f filename.tar.bz2<br>  ● 解压缩：tar -jxv -f filename.tar.bz2 -C 欲解压缩的目录<br>  ● 压    缩：tar -zcvf <em>.tar.gz  dir/file<br>  ● 解压缩 ：tar -zxvf  </em>.tar.gz</p>
+<p>下面介绍压缩中的战斗机xz<br>xz这个压缩可能很多都很陌生，不过您可知道xz是绝大数linux默认就带的一个压缩工具。<br>之前xz使用一直很少，所以几乎没有什么提起。<br>我是在下载phpmyadmin的时候看到这种压缩格式的，phpmyadmin压缩包xz格式的居然比7z还要小，这引起我的兴趣。<br>最新一段时间会经常听到xz被采用的声音，像是最新的archlinux某些东西就使用xz压缩。不过xz也有一个坏处就是压缩时间比较长，比7z压缩时间还长一些。不过压缩是一次性的，所以可以忽略。<br>xz压缩文件方法或命令<br>xz -z 要压缩的文件<br>如果要保留被压缩的文件加上参数 -k ，如果要设置压缩率加入参数 -0 到 -9调节压缩率。如果不设置，默认压缩等级是6.<br>xz解压文件方法或命令<br>xz -d 要解压的文件<br>同样使用 -k 参数来保留被解压缩的文件。<br>创建或解压tar.xz文件的方法<br>习惯了 tar czvf 或 tar xzvf 的人可能碰到 tar.xz也会想用单一命令搞定解压或压缩。其实不行 tar里面没有征对xz格式的参数比如 z是针对 gzip，j是针对 bzip2。<br>创建tar.xz文件：只要先 tar cvf xxx.tar xxx/ 这样创建xxx.tar文件先，然后使用 xz -z xxx.tar 来将 xxx.tar压缩成为 xxx.tar.xz<br>解压tar.xz文件：先 xz -d xxx.tar.xz 将 xxx.tar.xz解压成 xxx.tar 然后，再用 tar xvf xxx.tar来解包。</p>
+<p><a href="http://cn.linux.vbird.org/linux_basic/0240tarcompress.php" target="_blank" rel="external">更多压缩详解参考地址</a></p>
+<p>01-.tar格式<br>解包：[＊＊＊＊＊＊＊]$ tar xvf FileName.tar<br>打包：[＊＊＊＊＊＊＊]$ tar cvf FileName.tar DirName（注：tar是打包，不是压缩！）</p>
 <p>02-.gz格式<br>解压1：[＊＊＊＊＊＊＊]$ gunzip FileName.gz<br>解压2：[＊＊＊＊＊＊＊]$ gzip -d FileName.gz<br>压 缩：[＊＊＊＊＊＊＊]$ gzip FileName</p>
 <p>03-.tar.gz格式<br>解压：[＊＊＊＊＊＊＊]$ tar zxvf FileName.tar.gz<br>压缩：[＊＊＊＊＊＊＊]$ tar zcvf FileName.tar.gz DirName</p>
 <p>04-.bz2格式<br>解压1：[＊＊＊＊＊＊＊]$ bzip2 -d FileName.bz2<br>解压2：[＊＊＊＊＊＊＊]$ bunzip2 FileName.bz2<br>压 缩： [＊＊＊＊＊＊＊]$ bzip2 -z FileName</p>
@@ -94,6 +442,10 @@
 <p>12-.zip格式<br>解压：[＊＊＊＊＊＊＊]$ unzip FileName.zip<br>压缩：[＊＊＊＊＊＊＊]$ zip FileName.zip DirName</p>
 <p>13-.lha格式<br>解压：[＊＊＊＊＊＊＊]$ lha -e FileName.lha<br>压缩：[＊＊＊＊＊＊＊]$ lha -a FileName.lha FileName</p>
 <p>14-.rar格式<br>解压：[＊＊＊＊＊＊＊]$ rar a FileName.rar<br>压缩：[＊＊＊＊＊＊＊]$ rar e FileName.rar</p>
+<p>15-.tar.xz格式<br>打包：[＊＊＊＊＊＊＊]$ tar -cvf FileName.tar DirName（注：tar是打包，不是压缩！）<br>压缩：[＊＊＊＊＊＊＊]$ xz -z -9 FileName.tar （-0 到 -9 压缩率 默认-6其实变化不是很大）</p>
+<p>解压：[＊＊＊＊＊＊＊]$ xz -d FileName.tar.xz<br>解包：[＊＊＊＊＊＊＊]$ tar -xvf FileName.tar</p>
+<p>总结<br>常用的压缩格式     tar.gz     tar.bz2  bz2能比gz强那么一丢丢，但相差不是很大<br>压缩king   tar.xz   压缩大小几乎是上面两个的一半 很强 但是压缩速度很慢 有利有弊吧</p>
+<p>测试对比如下  具体实际情况灵活运用即可<br>[root@localhost others]# du -sh *<br>49M    dhcp<br>15M    dhcp.tar.bz2<br>16M    dhcp.tar.gz<br>8.0M    dhcp.tar.xz</p>
 ]]></content>
     
     <summary type="html">
@@ -187,7 +539,7 @@
     <link href="http://heweiblog.top/2017/09/11/rpm%E5%8C%85%E5%88%B6%E4%BD%9C/"/>
     <id>http://heweiblog.top/2017/09/11/rpm包制作/</id>
     <published>2017-09-11T01:42:59.000Z</published>
-    <updated>2017-09-11T01:47:28.483Z</updated>
+    <updated>2017-09-19T08:17:06.843Z</updated>
     
     <content type="html"><![CDATA[<a id="more"></a>
 <h2 id="rpm-即软件包管理"><a href="#rpm-即软件包管理" class="headerlink" title="rpm 即软件包管理"></a>rpm 即软件包管理</h2><p>关键点：SPEC文档    </p>
@@ -204,6 +556,86 @@
 <h2 id="卸载出现此情况解决方案"><a href="#卸载出现此情况解决方案" class="headerlink" title="卸载出现此情况解决方案"></a>卸载出现此情况解决方案</h2><p>[root@localhost heweiwei]# rpm -e edns_dial<br>error: “edns_dial” specifies multiple packages:<br>edns_dial-1.1.1.5-enterprise.el6.x86_64<br>edns_dial-1.1.1.5-1.el6.x86_64<br>[root@localhost heweiwei]# rpm -e edns_dial –allmatches<br>edns_dial-1.1.1.5-enterprise.el6.x86_64 edns_dial-1.1.1.5-1.el6.x86_64</p>
 <p>rpmbuild –showrc | grep topdir      查看系统默认的工作车间<br>自定义目录（车间）<br>vi ~/.rpmmacros<br>%_topdir        /home/heweiwei/rpmbuild    ##目录可以自定义<br>mkdir ~/rpmbuild<br>cd ~/rpmbuild<br>mkdir -pv {BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS} </p>
 <p>rpm -qi edns_dial 查看 rpm 包安装程序的详细信息</p>
+<h2 id="spec-文件举例"><a href="#spec-文件举例" class="headerlink" title="spec 文件举例"></a>spec 文件举例</h2><p>Name:        edns_dial<br>Version:    1.1.1.8<br>Release:    1%{?dist}<br>Summary:    dial    </p>
+<p>Group:        Applications/Internet<br>License:    GPL<br>URL:        <a href="http://www.yamutech.com" target="_blank" rel="external">http://www.yamutech.com</a><br>Source0:    %{name}-%{version}.tar.gz</p>
+<p>BuildRoot:      %{_topdir}/BUILDROOT</p>
+<p>#BuildRequires:    </p>
+<p>#Requires:        </p>
+<p>#%define debug_package %{nil}</p>
+<p>#%define __strip /bin/true</p>
+<p>#含有调试信息</p>
+<p>%description<br>dial</p>
+<p>%prep<br>%setup -q</p>
+<p>%build<br>make %{?_smp_mflags}</p>
+<p>#mkdir -p %{buildroot}/%{_bindir}</p>
+<p>#mkdir -p %{buildroot}/%{_sysconfdir}</p>
+<p>%install<br>rm -rf %{buildroot}<br>mkdir -p %{buildroot}/%{_bindir}</p>
+<p>#mkdir -p %{buildroot}/%{_libdir}<br>mkdir -p %{buildroot}/%{_sysconfdir}<br>mkdir -p %{buildroot}/%{_sysconfdir}/init.d<br>install -m 755 edns_dial %{buildroot}/%{_bindir}/edns_dial</p>
+<p>#install -m 755 libmysqlclient.so.18 %{buildroot}/%{_libdir}/libmysqlclient.so.18<br>install -m 755 config/dial_config %{buildroot}/%{_sysconfdir}/dial_config<br>install -m 755 config/dial_cert.pem %{buildroot}/%{_sysconfdir}/dial_cert.pem<br>install -m 755 ydial %{buildroot}/%{_sysconfdir}/init.d/ydial</p>
+<p>%clean<br>rm -rf %{buildroot}</p>
+<p>#rm -rf %{_topdir}/BUILDROOT</p>
+<p>#rm -rf %{_builddir}<br>rm -rf %{_topdir}/BUILD/%{name}-%{version}<br>rm -rf %{_topdir}/SOURCES/%{name}-%{version}.tar.gz<br>rm -rf %{_topdir}/SPECS/%{name}-%{version}.spec</p>
+<p>%post<br>chkconfig –add ydial</p>
+<p>%files<br>%defattr(-,root,root,-)<br>%{_bindir}/edns_dial<br>%{_sysconfdir}/dial_config<br>%{_sysconfdir}/dial_cert.pem<br>%{_sysconfdir}/init.d/ydial</p>
+<p>#/usr/bin/ends_dial</p>
+<p>#/usr/lib64/libmysqlclient.so.18</p>
+<p>#/etc/dial_config</p>
+<p>#/etc/dial_cert.pem</p>
+<p>%preun<br>chkconfig –del ydial</p>
+<p>%changelog</p>
+<h2 id="启动脚本"><a href="#启动脚本" class="headerlink" title="启动脚本"></a>启动脚本</h2><p>#!/bin/bash</p>
+<p>#edns_dial    start/stop manager</p>
+<p>#Authors: yamu, 2016, <a href="&#109;&#x61;&#105;&#108;&#x74;&#111;&#58;&#121;&#x61;&#x6d;&#x75;&#64;&#x79;&#x61;&#109;&#x75;&#116;&#x65;&#x63;&#x68;&#46;&#99;&#111;&#x6d;">&#121;&#x61;&#x6d;&#x75;&#64;&#x79;&#x61;&#109;&#x75;&#116;&#x65;&#x63;&#x68;&#46;&#99;&#111;&#x6d;</a></p>
+<p>#chkconfig: 345 13 87</p>
+<p>#description: edns_dial start/stop manager</p>
+<p>#processname: /usr/bin/edns_dial</p>
+<p>#pidfile: /var/run/edns_dial.pid</p>
+<p>#source function library<br>. /etc/rc.d/init.d/functions</p>
+<p>RETVAR=0<br>PROG=”edns_dial”<br>LOCK_FILE=/var/lock/subsys/edns_dial<br>pidfile=/var/run/edns_dial.pid<br>EDNS_DIAL_BIN=/usr/bin/edns_dial<br>kill_pid=/var/run/edns_dial.kill</p>
+<p>case “$1” in<br>    start)<br>        echo “Starting edns_dial: “<br>            daemon –pidfile=$pidfile ${EDNS_DIAL_BIN} start<br>            RETVAR=$?<br>        if [ $RETVAR -ne 0 ]<br>        then<br>            exit 6<br>        fi</p>
+<pre><code>    echo &quot;$(pgrep edns_dial|head -1)&quot; &gt; $pidfile
+    touch ${LOCK_FILE}
+    ;;
+
+stop)
+    echo -n $&quot;Shutting down $PROG: &quot;
+    if [ -f $pidfile ]
+    then
+        echo &quot;$(pgrep edns_dial|head -2)&quot; &gt; $kill_pid
+        for pid in `cat $kill_pid`
+        do
+            kill -9 $pid
+        done
+        RETVAR=$?
+        rm -f $pidfile
+    else
+        echo &quot;$(pgrep edns_dial|head -2)&quot; &gt; $kill_pid
+        for pid in `cat $kill_pid`
+        do
+            kill -9 $pid
+        done
+        RETVAR=$?
+    fi
+    [ $RETVAR -ne 0 ] &amp;&amp; exit 6
+    rm -f $LOCK_FILE
+    ;;
+
+restart|reload|force-reload)
+    $0 stop
+    $0 start
+    RETVAR=$?
+    ;;
+
+status)
+    status $EDNS_DIAL_BIN
+    RETVAR=$?
+    ;;
+*)
+    echo $&quot;Usage: $0 {start|stop|restart|reload|force-reload|status}&quot;
+    exit 2
+    ;;
+</code></pre><p>esac</p>
+<p>exit $RETVAR</p>
 ]]></content>
     
     <summary type="html">
